@@ -22,6 +22,7 @@ export interface AppSettings {
   hasCompletedWelcome: boolean; // Whether user has completed the welcome setup
   hasCompletedSetup: boolean; // Whether user has completed the setup wizard
   communitySharing: boolean; // Whether user has opted in to community data sharing
+  showAllDiveSections: boolean; // Show all dive detail sections even when empty
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -33,6 +34,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   hasCompletedWelcome: false,
   hasCompletedSetup: false,
   communitySharing: false,
+  showAllDiveSections: false,
 };
 
 // Format dive name based on prefix type
@@ -485,6 +487,21 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   type="checkbox"
                   checked={settings.showRatings}
                   onChange={(e) => handleChange('showRatings', e.target.checked)}
+                />
+                <span className="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div className="setting-row">
+              <label className="setting-label">
+                <span className="setting-name">Show All Dive Details</span>
+                <span className="setting-desc">Always show all dive detail sections, even when no data has been recorded</span>
+              </label>
+              <label className="toggle">
+                <input
+                  type="checkbox"
+                  checked={settings.showAllDiveSections}
+                  onChange={(e) => handleChange('showAllDiveSections', e.target.checked)}
                 />
                 <span className="toggle-slider"></span>
               </label>

@@ -1069,84 +1069,71 @@ export function RightPanel({ photo, dive, trip, onPhotoUpdated, onSpeciesIdentif
             </div>
 
             {/* Environment Section */}
-            {(dive.water_temp_c || dive.air_temp_c || dive.visibility_m || dive.surface_pressure_bar) && (
+            {(dive.water_temp_c || dive.air_temp_c || dive.visibility_m || dive.surface_pressure_bar || settings.showAllDiveSections) && (
               <div className="panel-section">
                 <h4 className="panel-section-title">Environment</h4>
                 <dl className="info-list">
-                  {dive.water_temp_c && (
-                    <div className="info-item">
-                      <dt>Water Temp</dt>
-                      <dd>{dive.water_temp_c.toFixed(1)} °C</dd>
-                    </div>
-                  )}
-                  {dive.air_temp_c && (
-                    <div className="info-item">
-                      <dt>Air Temp</dt>
-                      <dd>{dive.air_temp_c.toFixed(1)} °C</dd>
-                    </div>
-                  )}
-                  {dive.visibility_m && (
-                    <div className="info-item">
-                      <dt>Visibility</dt>
-                      <dd>{dive.visibility_m} m</dd>
-                    </div>
-                  )}
-                  {dive.surface_pressure_bar && (
-                    <div className="info-item">
-                      <dt>Surface Pressure</dt>
-                      <dd>{dive.surface_pressure_bar.toFixed(3)} bar</dd>
-                    </div>
-                  )}
-                  {dive.is_fresh_water && (
-                    <div className="info-item">
-                      <dt>Water Type</dt>
-                      <dd>Fresh water</dd>
-                    </div>
-                  )}
+                  <div className="info-item">
+                    <dt>Water Temp</dt>
+                    <dd>{dive.water_temp_c != null ? `${dive.water_temp_c.toFixed(1)} °C` : '—'}</dd>
+                  </div>
+                  <div className="info-item">
+                    <dt>Air Temp</dt>
+                    <dd>{dive.air_temp_c != null ? `${dive.air_temp_c.toFixed(1)} °C` : '—'}</dd>
+                  </div>
+                  <div className="info-item">
+                    <dt>Visibility</dt>
+                    <dd>{dive.visibility_m != null ? `${dive.visibility_m} m` : '—'}</dd>
+                  </div>
+                  <div className="info-item">
+                    <dt>Surface Pressure</dt>
+                    <dd>{dive.surface_pressure_bar != null ? `${dive.surface_pressure_bar.toFixed(3)} bar` : '—'}</dd>
+                  </div>
+                  <div className="info-item">
+                    <dt>Water Type</dt>
+                    <dd>{dive.is_fresh_water ? 'Fresh water' : 'Salt water'}</dd>
+                  </div>
                 </dl>
               </div>
             )}
 
             {/* Gas & Decompression Section */}
-            {(diveTanks.some(t => t.o2_percent && t.o2_percent !== 21) || dive.cns_percent || dive.otu) && (
+            {(diveTanks.some(t => t.o2_percent && t.o2_percent !== 21) || dive.cns_percent || dive.otu || settings.showAllDiveSections) && (
               <div className="panel-section">
                 <h4 className="panel-section-title">Gas & Deco</h4>
                 <dl className="info-list">
-                  {diveTanks.some(t => t.o2_percent && t.o2_percent !== 21) && (
-                    <div className="info-item">
-                      <dt>Gas Mix</dt>
-                      <dd>
-                        {diveTanks.map(t => {
-                          if (!t.o2_percent || t.o2_percent === 21) return null;
-                          if (t.he_percent && t.he_percent > 0) {
-                            return `TX${t.o2_percent}/${t.he_percent}`;
-                          }
-                          return `EAN${t.o2_percent}`;
-                        }).filter(Boolean).join(', ')}
-                      </dd>
-                    </div>
-                  )}
-                  {dive.cns_percent != null && dive.cns_percent > 0 && (
-                    <div className="info-item">
-                      <dt>CNS</dt>
-                      <dd>{dive.cns_percent.toFixed(0)}%</dd>
-                    </div>
-                  )}
-                  {dive.otu != null && dive.otu > 0 && (
-                    <div className="info-item">
-                      <dt>OTU</dt>
-                      <dd>{dive.otu}</dd>
-                    </div>
-                  )}
+                  <div className="info-item">
+                    <dt>Gas Mix</dt>
+                    <dd>
+                      {diveTanks.some(t => t.o2_percent && t.o2_percent !== 21)
+                        ? diveTanks.map(t => {
+                            if (!t.o2_percent || t.o2_percent === 21) return null;
+                            if (t.he_percent && t.he_percent > 0) return `TX${t.o2_percent}/${t.he_percent}`;
+                            return `EAN${t.o2_percent}`;
+                          }).filter(Boolean).join(', ')
+                        : '—'}
+                    </dd>
+                  </div>
+                  <div className="info-item">
+                    <dt>CNS</dt>
+                    <dd>{dive.cns_percent != null && dive.cns_percent > 0 ? `${dive.cns_percent.toFixed(0)}%` : '—'}</dd>
+                  </div>
+                  <div className="info-item">
+                    <dt>OTU</dt>
+                    <dd>{dive.otu != null && dive.otu > 0 ? dive.otu : '—'}</dd>
+                  </div>
                 </dl>
               </div>
             )}
 
             {/* Tank Pressures Section */}
-            {tankSummaries.length > 0 && (
+            {(tankSummaries.length > 0 || settings.showAllDiveSections) && (
               <div className="panel-section">
                 <h4 className="panel-section-title">Tanks</h4>
                 <dl className="info-list">
+                  {tankSummaries.length === 0 && (
+                    <div className="info-item"><dt>Tank</dt><dd>—</dd></div>
+                  )}
                   {tankSummaries.map((tank, index) => {
                     // Format gas mix display
                     let gasMix = '';
@@ -1193,16 +1180,14 @@ export function RightPanel({ photo, dive, trip, onPhotoUpdated, onSpeciesIdentif
             )}
 
             {/* Equipment Section */}
-            {(dive.dive_computer_model || diveEquipmentSets.length > 0 || cameraEquipmentSets.length > 0) && (
+            {(dive.dive_computer_model || diveEquipmentSets.length > 0 || cameraEquipmentSets.length > 0 || settings.showAllDiveSections) && (
               <div className="panel-section">
                 <h4 className="panel-section-title">Equipment</h4>
                 <dl className="info-list">
-                  {dive.dive_computer_model && (
-                    <div className="info-item">
-                      <dt>Dive Computer</dt>
-                      <dd>{dive.dive_computer_model}</dd>
-                    </div>
-                  )}
+                  <div className="info-item">
+                    <dt>Dive Computer</dt>
+                    <dd>{dive.dive_computer_model || '—'}</dd>
+                  </div>
                   {dive.dive_computer_serial && (
                     <div className="info-item">
                       <dt>Serial</dt>
@@ -1240,22 +1225,18 @@ export function RightPanel({ photo, dive, trip, onPhotoUpdated, onSpeciesIdentif
             )}
 
             {/* Location Section */}
-            {(dive.location || (dive.latitude && dive.longitude)) && (
+            {(dive.location || (dive.latitude && dive.longitude) || settings.showAllDiveSections) && (
               <div className="panel-section">
                 <h4 className="panel-section-title">Location</h4>
                 <dl className="info-list">
-                  {dive.location && (
-                    <div className="info-item">
-                      <dt>Site</dt>
-                      <dd>{dive.location}</dd>
-                    </div>
-                  )}
-                  {dive.ocean && (
-                    <div className="info-item">
-                      <dt>Ocean</dt>
-                      <dd>{dive.ocean}</dd>
-                    </div>
-                  )}
+                  <div className="info-item">
+                    <dt>Site</dt>
+                    <dd>{dive.location || '—'}</dd>
+                  </div>
+                  <div className="info-item">
+                    <dt>Ocean</dt>
+                    <dd>{dive.ocean || '—'}</dd>
+                  </div>
                   {dive.latitude != null && dive.longitude != null && (
                     <div className="info-item">
                       <dt>GPS</dt>
@@ -1304,19 +1285,17 @@ export function RightPanel({ photo, dive, trip, onPhotoUpdated, onSpeciesIdentif
             )}
 
             {/* People Section */}
-            {(dive.buddy || dive.divemaster || dive.guide || dive.instructor) && (
+            {(dive.buddy || dive.divemaster || dive.guide || dive.instructor || settings.showAllDiveSections) && (
               <div className="panel-section">
                 <h4 className="panel-section-title">People</h4>
                 <dl className="info-list">
-                  {dive.buddy && (
-                    <div className="info-item">
-                      <dt>Buddy</dt>
-                      <dd>{dive.buddy}</dd>
-                    </div>
-                  )}
-                  {(dive.divemaster || dive.guide || dive.instructor) && (
-                    <div className="info-item">
-                      <dt>Guide / Instructor</dt>
+                  <div className="info-item">
+                    <dt>Buddy</dt>
+                    <dd>{dive.buddy || '—'}</dd>
+                  </div>
+                  <div className="info-item">
+                    <dt>Guide / Instructor</dt>
+                    {(dive.divemaster || dive.guide || dive.instructor) ? (
                       <dd className="personnel-display">
                         <span className="personnel-name">
                           {dive.divemaster || dive.guide || dive.instructor}
@@ -1327,14 +1306,16 @@ export function RightPanel({ photo, dive, trip, onPhotoUpdated, onSpeciesIdentif
                           {dive.instructor && <span className="role-tag">Instructor</span>}
                         </span>
                       </dd>
-                    </div>
-                  )}
+                    ) : (
+                      <dd>—</dd>
+                    )}
+                  </div>
                 </dl>
               </div>
             )}
 
             {/* Dive Type Tags */}
-            {(dive.is_boat_dive || dive.is_drift_dive || dive.is_night_dive || dive.is_training_dive) && (
+            {(dive.is_boat_dive || dive.is_drift_dive || dive.is_night_dive || dive.is_training_dive || settings.showAllDiveSections) && (
               <div className="panel-section">
                 <h4 className="panel-section-title">Dive Type</h4>
                 <div className="dive-type-tags">
@@ -1342,14 +1323,17 @@ export function RightPanel({ photo, dive, trip, onPhotoUpdated, onSpeciesIdentif
                   {dive.is_drift_dive && <span className="dive-type-tag">🌊 Drift</span>}
                   {dive.is_night_dive && <span className="dive-type-tag">🌙 Night</span>}
                   {dive.is_training_dive && <span className="dive-type-tag">📚 Training</span>}
+                  {!dive.is_boat_dive && !dive.is_drift_dive && !dive.is_night_dive && !dive.is_training_dive && (
+                    <span className="text-muted">—</span>
+                  )}
                 </div>
               </div>
             )}
 
-            {dive.comments && (
+            {(dive.comments || settings.showAllDiveSections) && (
               <div className="panel-section">
                 <h4 className="panel-section-title">Notes</h4>
-                <p className="dive-notes">{dive.comments}</p>
+                <p className="dive-notes">{dive.comments || '—'}</p>
               </div>
             )}
           </div>
