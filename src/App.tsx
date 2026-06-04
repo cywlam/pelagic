@@ -44,7 +44,7 @@ import { DeletePhotosConfirmModal } from './components/DeletePhotosConfirmModal'
 import { PhotoArchiveModal } from './components/PhotoArchiveModal';
 import { useCommunitySync } from './hooks/useCommunitySync';
 import { modKey } from './utils/platform';
-import type { Photo, PhotoArchiveScope } from './types';
+import type { Photo, PhotoArchiveScope, Dive } from './types';
 
 // Check if we're in dev mode
 const isDev = import.meta.env.DEV;
@@ -99,7 +99,21 @@ function App() {
     searchResults,
     searchQuery,
     clearSearch,
+    activeDiveTagFilter,
+    setDiveTagFilter,
   } = useSearchStore();
+
+  const [tagFilteredDives, setTagFilteredDives] = useState<Dive[] | null>(null);
+
+  useEffect(() => {
+    if (activeDiveTagFilter) {
+      invoke<import('./types').Dive[]>('get_dives_with_tag', { tagId: activeDiveTagFilter.id })
+        .then(setTagFilteredDives)
+        .catch(() => setTagFilteredDives([]));
+    } else {
+      setTagFilteredDives(null);
+    }
+  }, [activeDiveTagFilter?.id]);
 
   // UI store
   const {
@@ -1457,6 +1471,8 @@ function App() {
           onAllTripPhotosLoaded={handleAllTripPhotosLoaded}
           onDiveContextMenu={handleDiveContextMenu}
           onPhotoContextMenu={handlePhotoContextMenu}
+          diveTagFilter={activeDiveTagFilter && tagFilteredDives !== null ? { tag: activeDiveTagFilter, dives: tagFilteredDives } : null}
+          onClearDiveTagFilter={() => setDiveTagFilter(null)}
         />
         {!isRightPanelCollapsed ? (
           <RightPanel

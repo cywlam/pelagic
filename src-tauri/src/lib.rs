@@ -365,6 +365,12 @@ pub fn run() {
             commands::community_search,
             // Dive numbering commands
             commands::reset_dive_numbering,
+            // Dive tag commands
+            commands::get_all_dive_tags,
+            commands::get_tags_for_dive,
+            commands::add_tag_to_dive,
+            commands::remove_tag_from_dive,
+            commands::get_dives_with_tag,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

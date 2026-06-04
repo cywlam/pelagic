@@ -310,6 +310,11 @@ export interface GeneralTag {
   name: string;
 }
 
+export interface DiveTag {
+  id: number;
+  name: string;
+}
+
 export interface PhotoSpeciesTag {
   photo_id: number;
   species_tag_id: number;

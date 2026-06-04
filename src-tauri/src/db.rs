@@ -150,6 +150,12 @@ pub struct GeneralTag {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DiveTag {
+    pub id: i64,
+    pub name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DiveSite {
     pub id: i64,
     pub name: String,
@@ -915,7 +921,74 @@ impl<'a> Db<'a> {
         )?;
         Ok(())
     }
-    
+
+    // ── Dive tag methods ────────────────────────────────────────────────────
+
+    pub fn get_all_dive_tags(&self) -> Result<Vec<DiveTag>> {
+        let mut stmt = self.conn.prepare("SELECT id, name FROM dive_tags ORDER BY name")?;
+        let tags = stmt.query_map([], |row| {
+            Ok(DiveTag { id: row.get(0)?, name: row.get(1)? })
+        })?.collect::<Result<Vec<_>>>()?;
+        Ok(tags)
+    }
+
+    pub fn get_or_create_dive_tag(&self, name: &str) -> Result<i64> {
+        let existing: Option<i64> = self.conn.query_row(
+            "SELECT id FROM dive_tags WHERE name = ? COLLATE NOCASE",
+            [name], |row| row.get(0)
+        ).ok();
+        if let Some(id) = existing { return Ok(id); }
+        self.conn.execute("INSERT INTO dive_tags (name) VALUES (?)", [name])?;
+        Ok(self.conn.last_insert_rowid())
+    }
+
+    pub fn get_tags_for_dive(&self, dive_id: i64) -> Result<Vec<DiveTag>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT dt.id, dt.name FROM dive_tags dt
+             JOIN dive_tag_assignments dta ON dta.tag_id = dt.id
+             WHERE dta.dive_id = ? ORDER BY dt.name"
+        )?;
+        let tags = stmt.query_map([dive_id], |row| {
+            Ok(DiveTag { id: row.get(0)?, name: row.get(1)? })
+        })?.collect::<Result<Vec<_>>>()?;
+        Ok(tags)
+    }
+
+    pub fn add_tag_to_dive(&self, dive_id: i64, tag_id: i64) -> Result<()> {
+        self.conn.execute(
+            "INSERT OR IGNORE INTO dive_tag_assignments (dive_id, tag_id) VALUES (?, ?)",
+            params![dive_id, tag_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn remove_tag_from_dive(&self, dive_id: i64, tag_id: i64) -> Result<()> {
+        self.conn.execute(
+            "DELETE FROM dive_tag_assignments WHERE dive_id = ? AND tag_id = ?",
+            params![dive_id, tag_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_dives_with_tag(&self, tag_id: i64) -> Result<Vec<Dive>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT d.id, d.trip_id, d.dive_number, d.date, d.time, d.duration_seconds,
+                    d.max_depth_m, d.mean_depth_m, d.water_temp_c, d.air_temp_c,
+                    d.surface_pressure_bar, d.otu, d.cns_percent, d.dive_computer_model,
+                    d.dive_computer_serial, d.location, d.ocean, d.visibility_m,
+                    d.gear_profile_id, d.buddy, d.divemaster, d.guide, d.instructor,
+                    d.comments, d.latitude, d.longitude, d.dive_site_id,
+                    d.is_fresh_water, d.is_boat_dive, d.is_drift_dive,
+                    d.is_night_dive, d.is_training_dive, d.created_at, d.updated_at
+             FROM dives d
+             JOIN dive_tag_assignments dta ON dta.dive_id = d.id
+             WHERE dta.tag_id = ?
+             ORDER BY d.date DESC, d.time DESC"
+        )?;
+        let dives = stmt.query_map([tag_id], Self::map_dive_row)?.collect::<Result<Vec<_>>>()?;
+        Ok(dives)
+    }
+
     pub fn get_common_general_tags_for_photos(&self, photo_ids: &[i64]) -> Result<Vec<GeneralTag>> {
         if photo_ids.is_empty() {
             return Ok(Vec::new());
@@ -2574,6 +2647,20 @@ impl Database {
                 version INTEGER PRIMARY KEY,
                 applied_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
+
+            CREATE TABLE IF NOT EXISTS dive_tags (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS dive_tag_assignments (
+                dive_id INTEGER NOT NULL REFERENCES dives(id) ON DELETE CASCADE,
+                tag_id INTEGER NOT NULL REFERENCES dive_tags(id) ON DELETE CASCADE,
+                PRIMARY KEY (dive_id, tag_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_dive_tag_assignments_dive ON dive_tag_assignments(dive_id);
         "#)?;
         
         Ok(())
@@ -2584,7 +2671,7 @@ impl Database {
     }
     
     // Current schema version - increment this when adding new migrations
-    pub const CURRENT_SCHEMA_VERSION: i64 = 9;
+    pub const CURRENT_SCHEMA_VERSION: i64 = 10;
     
     /// Check if migrations are needed without running them
     pub fn needs_migration(conn: &Connection) -> bool {
@@ -2689,7 +2776,13 @@ impl Database {
             progress("Making trips optional for dives...");
             Self::run_migration_v9(conn)?;
         }
-        
+
+        // Version 9 -> 10: Add dive tags tables
+        if current_version < 10 {
+            progress("Adding dive tags...");
+            Self::run_migration_v10(conn)?;
+        }
+
         // Seed default equipment categories if table is empty
         progress("Configuring equipment categories...");
         let categories_count: i64 = conn.query_row(
@@ -3091,7 +3184,27 @@ impl Database {
         log::info!("Migration v9 complete");
         Ok(())
     }
-    
+
+    /// Migration v10: Add dive tags tables
+    fn run_migration_v10(conn: &Connection) -> Result<()> {
+        log::info!("Running migration v10: adding dive tags...");
+        conn.execute_batch("
+            CREATE TABLE IF NOT EXISTS dive_tags (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS dive_tag_assignments (
+                dive_id INTEGER NOT NULL REFERENCES dives(id) ON DELETE CASCADE,
+                tag_id INTEGER NOT NULL REFERENCES dive_tags(id) ON DELETE CASCADE,
+                PRIMARY KEY (dive_id, tag_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_dive_tag_assignments_dive ON dive_tag_assignments(dive_id);
+        ")?;
+        log::info!("Migration v10 complete");
+        Ok(())
+    }
+
     /// Data migrations that check actual data state (not schema)
     /// These are idempotent and safe to run multiple times
     fn run_data_migrations(conn: &Connection) -> Result<()> {

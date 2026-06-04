@@ -1,11 +1,12 @@
 import { create } from 'zustand';
-import type { SearchResults, CommunitySearchResults } from '../types';
+import type { SearchResults, CommunitySearchResults, DiveTag } from '../types';
 
 interface SearchState {
   searchResults: SearchResults | null;
   searchQuery: string;
   communityResults: CommunitySearchResults | null;
   communityLoading: boolean;
+  activeDiveTagFilter: DiveTag | null;
 }
 
 interface SearchActions {
@@ -13,6 +14,7 @@ interface SearchActions {
   setCommunityResults: (results: CommunitySearchResults | null) => void;
   setCommunityLoading: (loading: boolean) => void;
   clearSearch: () => void;
+  setDiveTagFilter: (tag: DiveTag | null) => void;
 }
 
 type SearchStore = SearchState & SearchActions;
@@ -22,6 +24,7 @@ export const useSearchStore = create<SearchStore>((set) => ({
   searchQuery: '',
   communityResults: null,
   communityLoading: false,
+  activeDiveTagFilter: null,
 
   setSearchResults: (results, query) =>
     set({ searchResults: results, searchQuery: query }),
@@ -34,4 +37,7 @@ export const useSearchStore = create<SearchStore>((set) => ({
 
   clearSearch: () =>
     set({ searchResults: null, searchQuery: '', communityResults: null, communityLoading: false }),
+
+  setDiveTagFilter: (tag) =>
+    set({ activeDiveTagFilter: tag }),
 }));

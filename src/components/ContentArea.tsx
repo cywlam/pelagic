@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import type { Trip, Dive, Photo, ViewMode, DiveSample, PhotoSortField, SortDirection, SearchResults, IdentificationResult, DiveSite, ContentLayout } from '../types';
+import type { Trip, Dive, Photo, ViewMode, DiveSample, PhotoSortField, SortDirection, SearchResults, IdentificationResult, DiveSite, ContentLayout, DiveTag } from '../types';
 import { DiveProfile } from './DiveProfile';
 import { ContentGrid } from './ContentGrid';
 import { StatsBar } from './StatsBar';
@@ -50,6 +50,9 @@ interface ContentAreaProps {
   // Context menu callbacks
   onDiveContextMenu?: (diveId: number, tripId: number, x: number, y: number) => void;
   onPhotoContextMenu?: (photo: Photo, x: number, y: number) => void;
+  // Dive tag filter
+  diveTagFilter?: { tag: DiveTag; dives: Dive[] } | null;
+  onClearDiveTagFilter?: () => void;
 }
 
 const LAYOUT_OPTIONS: { value: ContentLayout; label: string; title: string; icon: React.ReactNode }[] = [
@@ -206,6 +209,8 @@ export function ContentArea({
   onAllTripPhotosLoaded,
   onDiveContextMenu,
   onPhotoContextMenu,
+  diveTagFilter,
+  onClearDiveTagFilter,
 }: ContentAreaProps) {
   const [samples, setSamples] = useState<DiveSample[]>([]);
   const [sortField, setSortField] = useState<PhotoSortField>('capture_time');
@@ -408,6 +413,50 @@ export function ContentArea({
     }
     loadSamples();
   }, [dive]);
+
+  // Dive tag filter view
+  if (diveTagFilter) {
+    return (
+      <div className="content">
+        <div className="content-header search-header">
+          <h2>
+            Dives tagged: <em>{diveTagFilter.tag.name}</em>
+            <span className="result-count">({diveTagFilter.dives.length} dive{diveTagFilter.dives.length !== 1 ? 's' : ''})</span>
+          </h2>
+          <button className="clear-search-btn" onClick={onClearDiveTagFilter}>
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+            </svg>
+            Clear Filter
+          </button>
+        </div>
+        <div className="search-results-content">
+          {diveTagFilter.dives.length === 0 ? (
+            <p className="text-muted" style={{ padding: '16px' }}>No dives found with this tag.</p>
+          ) : (
+            <div className="search-results-section">
+              <div className="results-grid dives-grid">
+                {diveTagFilter.dives.map(diveItem => (
+                  <button
+                    key={diveItem.id}
+                    className="result-card dive-card"
+                    onClick={() => onSelectDive(diveItem.id)}
+                  >
+                    <div className="card-title">
+                      {formatDiveName(settings.diveNamePrefix, diveItem.dive_number)}{diveItem.location ? ` — ${diveItem.location}` : ''}
+                    </div>
+                    <div className="card-meta">
+                      {diveItem.date} · {diveItem.max_depth_m?.toFixed(1)}m max
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   // Search results view
   if (viewMode === 'search' && searchResults) {

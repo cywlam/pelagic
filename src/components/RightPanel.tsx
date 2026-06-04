@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { format } from 'date-fns';
 import { invoke } from '@tauri-apps/api/core';
-import type { Photo, Dive, SpeciesTag, GeneralTag, Trip, IdentificationResult, TankPressure, DiveTank, EquipmentSet, PhotoDiveContext, ExternalSubmission, SpeciesEnrichmentCache, INatSubmissionResult } from '../types';
+import type { Photo, Dive, SpeciesTag, GeneralTag, Trip, IdentificationResult, TankPressure, DiveTank, EquipmentSet, PhotoDiveContext, ExternalSubmission, SpeciesEnrichmentCache, INatSubmissionResult, DiveTag } from '../types';
 import { IUCN_LABELS, IUCN_COLORS, MEGAFAUNA_DEEP_LINKS } from '../types';
 import { useGeminiApiKey, useSettings } from './SettingsModal';
+import { useSearchStore } from '../stores/searchStore';
 import { logger } from '../utils/logger';
 import './RightPanel.css';
 
@@ -68,6 +69,13 @@ export function RightPanel({ photo, dive, trip, onPhotoUpdated, onSpeciesIdentif
   const [submitError, setSubmitError] = useState<string | null>(null);
   const { apiKey: geminiApiKey } = useGeminiApiKey();
   const settings = useSettings();
+  const setDiveTagFilter = useSearchStore(s => s.setDiveTagFilter);
+
+  // Dive tags state
+  const [diveTags, setDiveTags] = useState<DiveTag[]>([]);
+  const [allDiveTags, setAllDiveTags] = useState<DiveTag[]>([]);
+  const [tagInput, setTagInput] = useState('');
+  const [tagSuggestions, setTagSuggestions] = useState<DiveTag[]>([]);
 
   // Community sightings state
   const [communitySightings, setCommunitySightings] = useState<CommunitySiteSpecies[]>([]);
@@ -191,13 +199,71 @@ export function RightPanel({ photo, dive, trip, onPhotoUpdated, onSpeciesIdentif
       loadTankPressures(dive.id);
       loadDiveTanks(dive.id);
       loadEquipmentSets(dive.id);
+      loadDiveTags(dive.id);
     } else {
       setTankPressures([]);
       setDiveTanks([]);
       setDiveEquipmentSets([]);
       setCameraEquipmentSets([]);
+      setDiveTags([]);
     }
   }, [dive?.id]);
+
+  // Load all dive tags once for autocomplete
+  useEffect(() => {
+    invoke<DiveTag[]>('get_all_dive_tags')
+      .then(setAllDiveTags)
+      .catch(() => {});
+  }, []);
+
+  const loadDiveTags = async (diveId: number) => {
+    try {
+      const tags = await invoke<DiveTag[]>('get_tags_for_dive', { diveId });
+      setDiveTags(tags);
+    } catch (error) {
+      logger.error('Failed to load dive tags:', error);
+      setDiveTags([]);
+    }
+  };
+
+  const handleAddDiveTag = async (tagName: string) => {
+    if (!dive || !tagName.trim()) return;
+    try {
+      await invoke('add_tag_to_dive', { diveId: dive.id, tagName: tagName.trim() });
+      const updated = await invoke<DiveTag[]>('get_tags_for_dive', { diveId: dive.id });
+      setDiveTags(updated);
+      const allUpdated = await invoke<DiveTag[]>('get_all_dive_tags');
+      setAllDiveTags(allUpdated);
+    } catch (error) {
+      logger.error('Failed to add dive tag:', error);
+    }
+    setTagInput('');
+    setTagSuggestions([]);
+  };
+
+  const handleRemoveDiveTag = async (tagId: number) => {
+    if (!dive) return;
+    try {
+      await invoke('remove_tag_from_dive', { diveId: dive.id, tagId });
+      setDiveTags(prev => prev.filter(t => t.id !== tagId));
+    } catch (error) {
+      logger.error('Failed to remove dive tag:', error);
+    }
+  };
+
+  const handleTagInputChange = (value: string) => {
+    setTagInput(value);
+    if (value.trim().length > 0) {
+      const lower = value.toLowerCase();
+      setTagSuggestions(
+        allDiveTags
+          .filter(t => t.name.toLowerCase().includes(lower) && !diveTags.some(dt => dt.id === t.id))
+          .slice(0, 6)
+      );
+    } else {
+      setTagSuggestions([]);
+    }
+  };
 
   const loadTankPressures = async (diveId: number) => {
     try {
@@ -1352,6 +1418,62 @@ export function RightPanel({ photo, dive, trip, onPhotoUpdated, onSpeciesIdentif
                 <p className="dive-notes">{dive.comments}</p>
               </div>
             )}
+
+            {/* Dive Tags Section */}
+            <div className="panel-section">
+              <h4 className="panel-section-title">Tags</h4>
+              <div className="dive-tags-section">
+                <div className="dive-tags-list">
+                  {diveTags.length === 0 && (
+                    <span className="text-muted">No tags</span>
+                  )}
+                  {diveTags.map(tag => (
+                    <div key={tag.id} className="dive-tag-chip">
+                      <button
+                        className="dive-tag-chip-name"
+                        onClick={() => setDiveTagFilter(tag)}
+                        title={`Filter dives by "${tag.name}"`}
+                      >
+                        {tag.name}
+                      </button>
+                      <button
+                        className="tag-chip-remove"
+                        onClick={() => handleRemoveDiveTag(tag.id)}
+                        title="Remove tag"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="dive-tag-input-wrapper">
+                  <input
+                    className="dive-tag-input"
+                    type="text"
+                    placeholder="Add tag..."
+                    value={tagInput}
+                    onChange={e => handleTagInputChange(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && tagInput.trim()) handleAddDiveTag(tagInput);
+                      if (e.key === 'Escape') { setTagInput(''); setTagSuggestions([]); }
+                    }}
+                  />
+                  {tagSuggestions.length > 0 && (
+                    <div className="dive-tag-suggestions">
+                      {tagSuggestions.map(s => (
+                        <button
+                          key={s.id}
+                          className="dive-tag-suggestion"
+                          onMouseDown={e => { e.preventDefault(); handleAddDiveTag(s.name); }}
+                        >
+                          {s.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </>
       )}

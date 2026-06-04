@@ -2028,6 +2028,42 @@ pub fn remove_general_tag_from_photo(
     Ok(())
 }
 
+// Dive tag commands
+
+use crate::db::DiveTag;
+
+#[tauri::command]
+pub fn get_all_dive_tags(state: State<AppState>) -> Result<Vec<DiveTag>, String> {
+    let conn = state.db.get().map_err(|e| format!("Database error: {}", e))?; let db = Db::new(&*conn);
+    db.get_all_dive_tags().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_tags_for_dive(state: State<AppState>, dive_id: i64) -> Result<Vec<DiveTag>, String> {
+    let conn = state.db.get().map_err(|e| format!("Database error: {}", e))?; let db = Db::new(&*conn);
+    db.get_tags_for_dive(dive_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn add_tag_to_dive(state: State<AppState>, dive_id: i64, tag_name: String) -> Result<i64, String> {
+    let conn = state.db.get().map_err(|e| format!("Database error: {}", e))?; let db = Db::new(&*conn);
+    let tag_id = db.get_or_create_dive_tag(&tag_name).map_err(|e| e.to_string())?;
+    db.add_tag_to_dive(dive_id, tag_id).map_err(|e| e.to_string())?;
+    Ok(tag_id)
+}
+
+#[tauri::command]
+pub fn remove_tag_from_dive(state: State<AppState>, dive_id: i64, tag_id: i64) -> Result<(), String> {
+    let conn = state.db.get().map_err(|e| format!("Database error: {}", e))?; let db = Db::new(&*conn);
+    db.remove_tag_from_dive(dive_id, tag_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_dives_with_tag(state: State<AppState>, tag_id: i64) -> Result<Vec<Dive>, String> {
+    let conn = state.db.get().map_err(|e| format!("Database error: {}", e))?; let db = Db::new(&*conn);
+    db.get_dives_with_tag(tag_id).map_err(|e| e.to_string())
+}
+
 // Statistics commands
 
 use crate::db::{Statistics, SpeciesCount, CameraStat, YearlyStat};
